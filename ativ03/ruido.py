@@ -1,13 +1,6 @@
 img1_path=r"C:\Users\LENOVO\Documents\VisaoComputacional\atividades\ativ03\img\banco2.jpg"
 img2_path=r"C:\Users\LENOVO\Documents\VisaoComputacional\atividades\ativ03\img\sapato1.jpg"
 
-""" 
-================
-    PARTE 1 
-================  
-"""
-#importando as imagens e extraindo caracteristicas iniciais
-
 import os
 import cv2
 import numpy as np
@@ -18,6 +11,27 @@ def parse_cv2(caminho_imagem):
     if img is None:
         raise FileNotFoundError(f"Não foi possível carregar a imagem em: {caminho_imagem}")
     return img
+
+""" Extraindo características das imagens(tamanho, qtd. canais de cores, formato etc) """
+def extrair_info(caminho_imagem):
+    img = cv2.imread(caminho_imagem, 0)
+    
+    if img is None:
+        print("Erro ao carregar imagem.")
+        return
+
+    dimensoes = img.shape
+    altura = dimensoes[0]
+    largura = dimensoes[1]
+    
+    canais = dimensoes[2] if len(dimensoes) > 2 else 1
+    _, extensao = os.path.splitext(caminho_imagem)
+
+    print(f"--- Informações ---")
+    print(f"Extensão do Arquivo: {extensao.upper()}")
+    print(f"Resolução: {largura}x{altura} pixels")
+    print(f"Canais de Cor: {canais}")
+    print("-" * 30)
 
 def calcular_metricas_imagem(entrada):
     """Calcula os dados matemáticos e de frequência de uma imagem."""
@@ -80,27 +94,6 @@ def exibir_plots(dados_primeira_img, nome_primeira_img, dados_segunda_img, nome_
     plt.tight_layout()
     plt.show()
 
-""" Extraindo características das imagens(tamanho, qtd. canais de cores, formato etc) """
-def extrair_info(caminho_imagem):
-    img = cv2.imread(caminho_imagem, 0)
-    
-    if img is None:
-        print("Erro ao carregar imagem.")
-        return
-
-    dimensoes = img.shape
-    altura = dimensoes[0]
-    largura = dimensoes[1]
-    
-    canais = dimensoes[2] if len(dimensoes) > 2 else 1
-    _, extensao = os.path.splitext(caminho_imagem)
-
-    print(f"--- Informações ---")
-    print(f"Extensão do Arquivo: {extensao.upper()}")
-    print(f"Resolução: {largura}x{altura} pixels")
-    print(f"Canais de Cor: {canais}")
-    print("-" * 30)
-
 def salt_and_pepper_noise(image, noise_rate):
     noisy_image = np.copy(image)
     min_value, max_value = 0, 255
@@ -118,6 +111,151 @@ def salt_and_pepper_noise(image, noise_rate):
 
     return noisy_image
 
+    """
+    Aplica o Filtro Passa-Baixa Gaussiano (GLPF) no domínio da frequência
+    e retorna a imagem filtrada de volta ao domínio espacial com suas métricas.
+    """
+    rows, cols = img_ruidosa.shape
+    crow, ccol = rows // 2, cols // 2
+
+    x, y = np.ogrid[:rows, :cols]
+    dist_quadrada = (x - crow)**2 + (y - ccol)**2
+    mask = np.exp(-dist_quadrada / (2 * (radius ** 2)))
+
+    f_transform = np.fft.fft2(img_ruidosa)
+    f_shift = np.fft.fftshift(f_transform)
+    filtered = f_shift * mask
+
+    img_back = np.fft.ifft2(np.fft.ifftshift(filtered))
+    img_back = np.abs(img_back)
+    img_back = np.clip(img_back, 0, 255).astype(np.uint8)
+
+    return {
+        "imagem_filtrada": img_back,
+        "mascara_frequencia": mask,
+        "media": np.mean(img_back),
+        "variancia": np.var(img_back)
+    }
+
+    """
+    Aplica o Filtro Passa-Alta Gaussiano (GHPF) no domínio da frequência
+    e retorna a imagem de altas frequências (bordas) de volta ao domínio espacial.
+    """
+    rows, cols = img_ruidosa.shape
+    crow, ccol = rows // 2, cols // 2
+
+    x, y = np.ogrid[:rows, :cols]
+    dist_quadrada = (x - crow)**2 + (y - ccol)**2
+    
+    # EQUAÇÃO DO PASSA-ALTA: 1 - exp(-D^2 / 2D0^2)
+    # Nota: para passa-alta, raios menores (ex: 15 a 30) costumam preservar mais a estrutura
+    mask = 1 - np.exp(-dist_quadrada / (2 * (radius ** 2)))
+
+    f_transform = np.fft.fft2(img_ruidosa)
+    f_shift = np.fft.fftshift(f_transform)
+    filtered = f_shift * mask
+
+    img_back = np.fft.ifft2(np.fft.ifftshift(filtered))
+    img_back = np.abs(img_back)
+    img_back = np.clip(img_back, 0, 255).astype(np.uint8)
+
+    return {
+        "imagem_filtrada": img_back,
+        "mascara_frequencia": mask
+    }
+
+def suavizacao_gaussiana_pequena(img_ruidosa):
+    """Aplica filtro Gaussiano com kernel pequeno 3x3 (Suavização Leve)."""
+    img_filtrada = cv2.GaussianBlur(img_ruidosa, (3, 3), 0)
+    return {"imagem_filtrada": img_filtrada}
+
+def suavizacao_gaussiana_grande(img_ruidosa):
+    """Aplica filtro Gaussiano com kernel maior 7x7 (Suavização Intensa)."""
+    img_filtrada = cv2.GaussianBlur(img_ruidosa, (7, 7), 0)
+    return {"imagem_filtrada": img_filtrada}
+
+def calcular_psnr(img_limpa, img_filtrada):
+    """
+    Calcula o PSNR (Peak Signal-to-Noise Ratio) entre a imagem original limpa
+    e a imagem após passar pelo filtro de suavização.
+    """
+    # Garante que as imagens estão no formato float para não estourar os limites do uint8
+    mse = np.mean((img_limpa.astype(np.float64) - img_filtrada.astype(np.float64)) ** 2)
+    
+    if mse == 0:
+        return float('inf')
+    
+    max_pixel = 255.0
+    psnr = 20 * np.log10(max_pixel / np.sqrt(mse))
+    return psnr
+
+def passa_alta_laplaciano(img_ruidosa):
+    """
+    Aplica o Filtro Passa-Alta Laplaciano no domínio da frequência
+    e retorna o mapa de bordas de segunda derivada no domínio espacial.
+    """
+    rows, cols = img_ruidosa.shape
+    crow, ccol = rows // 2, cols // 2
+
+    x, y = np.ogrid[:rows, :cols]
+    dist_quadrada = (x - crow)**2 + (y - ccol)**2
+    
+    max_dist = np.max(dist_quadrada)
+    mask = dist_quadrada / max_dist
+    f_transform = np.fft.fft2(img_ruidosa)
+    f_shift = np.fft.fftshift(f_transform)
+    filtered = f_shift * mask
+
+    img_back = np.fft.ifft2(np.fft.ifftshift(filtered))
+    img_back = np.abs(img_back)
+    img_back = cv2.normalize(img_back, None, 0, 255, cv2.NORM_MINMAX)
+    img_back = img_back.astype(np.uint8)
+
+    return {
+        "imagem_filtrada": img_back,
+        "mascara_frequencia": mask
+    }
+
+def exibir_plots_psnr(img1_k3, psnr1_k3, img1_k7, psnr1_k7, nome_img1,
+                                 img2_k3, psnr2_k3, img2_k7, psnr2_k7, nome_img2):
+    """
+    Gera uma matriz de subplots 2x2 para comparar visualmente e quantitativamente (via PSNR)
+    os efeitos dos kernels 3x3 e 7x7 em duas imagens distintas.
+    """
+    fig, eixos = plt.subplots(2, 2, figsize=(12, 10))
+    fig.suptitle("Análise Comparativa de Suavização Gaussiana via PSNR", fontsize=16, fontweight='bold')
+
+    # ---- LINHA 0: Primeira Imagem (Ex: Banco) ----
+    # Coluna 0: Kernel 3x3
+    eixos[0, 0].imshow(img1_k3, cmap='gray')
+    eixos[0, 0].set_title(f"{nome_img1} - Kernel 3x3\nPSNR: {psnr1_k3:.2f} dB")
+    eixos[0, 0].axis('off')
+
+    # Coluna 1: Kernel 7x7
+    eixos[0, 1].imshow(img1_k7, cmap='gray')
+    eixos[0, 1].set_title(f"{nome_img1} - Kernel 7x7\nPSNR: {psnr1_k7:.2f} dB")
+    eixos[0, 1].axis('off')
+
+    # ---- LINHA 1: Segunda Imagem (Ex: Sapato) ----
+    # Coluna 0: Kernel 3x3
+    eixos[1, 0].imshow(img2_k3, cmap='gray')
+    eixos[1, 0].set_title(f"{nome_img2} - Kernel 3x3\nPSNR: {psnr2_k3:.2f} dB")
+    eixos[1, 0].axis('off')
+
+    # Coluna 1: Kernel 7x7
+    eixos[1, 1].imshow(img2_k7, cmap='gray')
+    eixos[1, 1].set_title(f"{nome_img2} - Kernel 7x7\nPSNR: {psnr2_k7:.2f} dB")
+    eixos[1, 1].axis('off')
+
+    plt.tight_layout()
+    plt.show()
+""" 
+================
+    PARTE 1 
+================  
+"""
+#importando as imagens e extraindo caracteristicas iniciais
+
 img1=parse_cv2(img1_path)
 img2=parse_cv2(img2_path)
 
@@ -129,33 +267,6 @@ extrair_info(img1_path)
 extrair_info(img2_path)
 exibir_plots(dados_banco,'Banco',dados_sapato,'Sapato') #imagem original
 
-"""
-=================== 
-COMENTARIOS 
-===================
-
-[Média]
-> Banco: 
-> Sapato: 
-
-[Variância]
-> Banco: 
-> Sapato: 
-
-[Histograma]
-> Banco: 
-> Sapato: 
-
-[FFT] 
-> Banco: Na imagem transformada do banco, o brilho no centro da imagem indica que uma grande parte da mesma é 
-de baixa frequencia (regiões homogeneas, como a superfície branca do banco e os blocos dos azulejos).
-Além disso, existem várias direçoes para essas frequências, semelhante a um asterisco.
-Isso se dá pela variação na perspectiva das bordas presentes na imagem (vários ângulos diferentes).
-
-> Sapato: 
-
-"""
-
 ####
 
 """ 
@@ -164,7 +275,9 @@ Isso se dá pela variação na perspectiva das bordas presentes na imagem (vári
 ================   
 """
 #aplicando ruidos
-#ruido GAUSSIANO
+
+#################
+# 2.1. ruido GAUSSIANO
 
 noise1 = np.random.normal(0, 30, img1.shape)
 noise2=np.random.normal(0,30,img2.shape)
@@ -202,13 +315,8 @@ A degradação de bordas causada por esse ruído pode inviabilizar algoritmos de
 
 """
 
-""" 
-================
-    PARTE 3 
-================   
-"""
-#aplicando ruidos
-#ruido SAL E PIMENTA
+#################
+# 2.2. ruido SAL E PIMENTA
 
 img1_sp = salt_and_pepper_noise(img1, 0.2)
 img2_sp = salt_and_pepper_noise(img2, 0.2)
@@ -222,22 +330,122 @@ exibir_plots(dados_banco_sp,'Banco ruído sp',dados_sapato_sp,'Sapato ruído sp'
 =================== 
 COMENTARIOS 
 ===================
-ADD AQUI
+*porcentagem de pixels alterados *: 20%
+
+1-Como esse ruído se diferencia visualmente do ruído gaussiano?: 
+O ruído de sal e pimenta altera apenas uma porcentagem isolada de pixels específicos, deixando um aspecto salpicado
+na imagem por forçar os pixels a assumirem valores extremos (0 ou 255). Os pixels vizinhos não afetados continuam limpos.
+Eis a principal diferença para o ruído gaussiano, que gera uma perturbação em TODA a extensão da imagem.
+
+Em relação às imagens desse notebook, o sal e pimenta causa uma alteração mais significativa na variância e no histograma das imagens
+que o ruído gaussiano, pois o sp não trabalha com "faixas de transição" de intensidade. Isso também impacta na variância, pois
+o pixel sai do valor médio para assumir algum extremo (0 ou 255), intensificando a dispersão.
+
+2-Em quais situações esse ruído aparece em sistemas reais de captura de imagem?: 
+Geralmente, aparece devido a erros na transmissão de dados, falhas de célula de memória ou até mesmo 
+na conversão analógico-digital.
 """
 
+####
+
+""" 
+================
+    PARTE 3 
+================  
+"""
+#aplicando filtros
+
+#################
+# 3.1. filtro de PASSA BAIXA GAUSSIANO
+
+# A. teste com kernel de 3x3 (sauve)
+banco_suave_3x3=suavizacao_gaussiana_pequena(img1_ruido)
+sapato_suave_3x3=suavizacao_gaussiana_pequena(img2_ruido)
+dados_banco_3x3 = calcular_metricas_imagem(banco_suave_3x3["imagem_filtrada"])
+dados_sapato_3x3= calcular_metricas_imagem(sapato_suave_3x3["imagem_filtrada"])
+
+exibir_plots(dados_banco_3x3, 'Banco P.B. Gauss 3x3', dados_sapato_3x3, 'Sapato P.B Gauss Kernel 3x3')
+
+
+# B. teste com kernel de 7x7 (+intenso)
+banco_suave_7x7 = suavizacao_gaussiana_grande(img1_ruido)
+sapato_suave_7x7 = suavizacao_gaussiana_grande(img2_ruido)
+dados_banco_7x7 = calcular_metricas_imagem(banco_suave_7x7["imagem_filtrada"])
+dados_sapato_7x7 = calcular_metricas_imagem(sapato_suave_7x7["imagem_filtrada"])
+
+exibir_plots(dados_banco_7x7, 'Banco P.B Gauss Kernel 7x7', dados_sapato_7x7, 'Sapato P.B Gauss Kernel 7x7')
+
+#comparando qual kernel foi melhor: PSNR como métrica principal de análise
+psnr_banco_3x3 = calcular_psnr(img1, banco_suave_3x3["imagem_filtrada"])
+psnr_banco_7x7 = calcular_psnr(img1, banco_suave_7x7["imagem_filtrada"])
+psnr_sapato_3x3 = calcular_psnr(img2, sapato_suave_3x3["imagem_filtrada"])
+psnr_sapato_7x7 = calcular_psnr(img2, sapato_suave_7x7["imagem_filtrada"])
+
+exibir_plots_psnr (
+    banco_suave_3x3["imagem_filtrada"], psnr_banco_3x3, 
+    banco_suave_7x7["imagem_filtrada"], psnr_banco_7x7, 
+    'Banco',
+    sapato_suave_3x3["imagem_filtrada"], psnr_sapato_3x3, 
+    sapato_suave_7x7["imagem_filtrada"], psnr_sapato_7x7, 
+    'Sapato'
+)
+
+""" 
+=================== 
+COMENTARIOS 
+===================
+Os resultados quantitativos apontaram um PSNR superior para o Filtro Gaussiano com kernel 7x7 em comparação ao kernel 3x3.
+"""
+
+####
 
 """ 
 ================
     PARTE 4 
 ================  
 """
-#Filtro de passa baixa Gaussiano
+#filtro de passa alta
 
+#apliquei na imagem original porque, quando apliquei na img com ruido gaussiano, ficou completamente ilegivel devido aos componentes de alta frequencia
+#banco_pa_laplace = passa_alta_laplaciano(img1_ruido) 
+#sapato_pa_laplace = passa_alta_laplaciano(img2_ruido)
 
+banco_pa_laplace = passa_alta_laplaciano(img1) 
+sapato_pa_laplace = passa_alta_laplaciano(img2)
+
+dados_banco_pa_laplace = calcular_metricas_imagem(banco_pa_laplace["imagem_filtrada"])
+dados_sapato_pa_laplace = calcular_metricas_imagem(sapato_pa_laplace["imagem_filtrada"])
+
+exibir_plots(dados_banco_pa_laplace, 'Banco Passa Alta Laplace', dados_sapato_pa_laplace, 'Sapato Passa Alta Laplace')
 
 """ 
 =================== 
 COMENTARIOS 
 ===================
-->> metricas: PNSR, media, ↓ desvio padrao/variancia em ROI,Contagem Quantitativa de Pixels de Borda (Pós-Canny ou Sobel)
+Quando aplicado na imagem com ruído, o resultado do filtro apresentou degradação significativa. Como o ruído Gaussiano 
+inserido no passo anterior possui alta frequência espacial (variações bruscas pixel a pixel) e o filtro Laplaciano é 
+sensível a altas frequências devido à sua natureza derivativa, ele acabou amplificando o ruído em vez de 
+destacar apenas as bordas estruturais do banco e do sapato. Quando aplicado na imagem original, sem o ruído, o filtro conseguiu demarcar melhor algumas bordas.
+As respostas abaixo serão dadas em relação à aplicação do filtro na imagem original (sem ruído)
+
+1-que estruturas da imagem foram destacadas?: componentes de alta frequência espacial
+2-as bordas ficaram mais visíveis?: sim, especialmente os rejuntes da imagem do banco
+3-Esse tipo de filtro ajudaria em quais tarefas de visão computacional?: detecção de bordas e segmentação de fundo, 
+detecção de foco automático, identificação de pontos de interesse (como quinas) etc
+
 """
+
+####
+
+""" 
+================
+    PARTE 5 
+================  
+"""
+#Tabela
+""" Responder: 
+ Qual ruído degradou mais a imagem? Laplaciano.
+ O filtro gaussiano conseguiu recuperar a qualidade visual? Não muito.  
+ Em quais aplicações de visão computacional seria importante aplicar filtros antes do 
+processamento? 
+ """
