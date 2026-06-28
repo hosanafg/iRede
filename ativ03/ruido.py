@@ -281,6 +281,80 @@ def salvar_metricas_csv(dados_img1, nome_base_img1, psnr_img1,
 
     print(f"[DEBUG] Dados exportados: {caminho_csv1} e {caminho_csv2}")
 
+def tabela_final():
+    """
+    Varre os diretórios do projeto, lê os ficheiros .csv individuais de métricas,
+    e consolida tudo numa única tabela comparativa final completa.
+    """
+    linhas_tabela = []
+
+    mapeamento_pastas = {
+        'filtro_sal_e_pimenta': 'Ruído Sal e Pimenta',
+        'filtro_gaussiano': 'Ruído Gaussiano',
+        'filtro_passa_baixa_gaussiano_': 'Filtro Passa Baixa Gaussiano',
+        'filtro_passa_alta_laplace_': 'Passa-Alta Laplaciano' 
+    }
+
+    for pasta, categoria in mapeamento_pastas.items():
+        if not os.path.exists(pasta):
+            print(f"Aviso: A pasta '{pasta}' ainda não existe ou não foi processada.")
+            continue
+            
+        for arquivo in os.listdir(pasta):
+            if arquivo.endswith('.csv'):
+                caminho_completo = os.path.join(pasta, arquivo)
+
+                objeto = 'Banco' if arquivo.lower().startswith('banco') else 'Sapato'
+                configuracao = arquivo.replace(f"{objeto.lower()}_", "").replace(".csv", "").replace("_", " ").title()
+                media, variancia, psnr = None, None, None
+
+                try:
+                    with open(caminho_completo, mode='r', encoding='utf-8') as f:
+                        next(f) # Pula o cabeçalho "Métrica,Valor"
+                        for linha in f:
+                            partes = linha.strip().split(',')
+                            if len(partes) < 2:
+                                continue
+                            metrica, valor = partes[0], partes[1]
+                            
+                            if 'Média' in metrica:
+                                media = float(valor)
+                            elif 'Variância' in metrica:
+                                variancia = float(valor)
+                            elif 'PSNR' in metrica:
+                                psnr = valor
+                except Exception as e:
+                    print(f"Erro ao ler o ficheiro {arquivo}: {e}")
+                    continue
+
+                linhas_tabela.append({
+                    "Imagem": objeto,
+                    "Categoria": categoria,
+                    "Configuração / Filtro": configuracao,
+                    "Média": media,
+                    "Variância": variancia,
+                    "PSNR (dB)": psnr
+                })
+
+    if not linhas_tabela:
+        print("Nenhum dado foi encontrado para consolidar!")
+        return None
+
+    # Transforma em DataFrame e ordena para ficar legível
+    df_final = pd.DataFrame(linhas_tabela)
+    df_final = df_final.sort_values(by=["Imagem", "Categoria", "Configuração / Filtro"]).reset_index(drop=True)
+
+    df_final.to_csv("tabela_comparativa_filtros.csv", index=False, encoding='utf-8')
+    
+    try:
+        df_final.to_excel("tabela_comparativa_filtros.xlsx", index=False)
+        print("[DEBUG] Tabela final atualizada com SUCESSO tanto em .csv quanto em .xlsx!")
+    except ImportError:
+        print("[INFO] Tabela final atualizada com SUCESSO em 'tabela_comparativa_filtros.csv'!")
+
+    return df_final
+
+
 """ 
 ================
     PARTE 1 
@@ -516,81 +590,14 @@ detecção de foco automático, identificação de pontos de interesse (como qui
 """ Responder: 
  Qual ruído degradou mais a imagem? Laplaciano.
  O filtro gaussiano conseguiu recuperar a qualidade visual? Não muito.  
- Em quais aplicações de visão computacional seria importante aplicar filtros antes do processamento? 
+ Em quais aplicações de visão computacional seria importante aplicar filtros antes do processamento?
+os dados brutos capturados por sensores de câmeras raramente estão prontos para os algoritmos de alto nível. 
+Aplicar filtros no pré-processamento é uma etapa indispensável na grande maioria dos sistemas em produção. 
+Em sistemas que precisam identificar caracteres em movimento (como radares de trânsito), as imagens sofrem 
+com ruído proveniente de baixa luminosidade ou desfoque de movimento (motion blur). Para solucionar o problema,
+Filtros Gaussianos ou de Mediana são utilizados para eliminar a granulação do sensor antes de passar a imagem para o OCR.
+Sem isso, a leitura de placas seria degradada
  """
-
-def tabela_final():
-    """
-    Varre os diretórios do projeto, lê os ficheiros .csv individuais de métricas,
-    e consolida tudo numa única tabela comparativa final completa.
-    """
-    linhas_tabela = []
-
-    mapeamento_pastas = {
-        'filtro_sal_e_pimenta': 'Ruído Sal e Pimenta',
-        'filtro_gaussiano': 'Ruído Gaussiano',
-        'filtro_passa_baixa_gaussiano_': 'Filtro Passa Baixa Gaussiano',
-        'filtro_passa_alta_laplace_': 'Passa-Alta Laplaciano' 
-    }
-
-    for pasta, categoria in mapeamento_pastas.items():
-        if not os.path.exists(pasta):
-            print(f"Aviso: A pasta '{pasta}' ainda não existe ou não foi processada.")
-            continue
-            
-        for arquivo in os.listdir(pasta):
-            if arquivo.endswith('.csv'):
-                caminho_completo = os.path.join(pasta, arquivo)
-
-                objeto = 'Banco' if arquivo.lower().startswith('banco') else 'Sapato'
-                configuracao = arquivo.replace(f"{objeto.lower()}_", "").replace(".csv", "").replace("_", " ").title()
-                media, variancia, psnr = None, None, None
-
-                try:
-                    with open(caminho_completo, mode='r', encoding='utf-8') as f:
-                        next(f) # Pula o cabeçalho "Métrica,Valor"
-                        for linha in f:
-                            partes = linha.strip().split(',')
-                            if len(partes) < 2:
-                                continue
-                            metrica, valor = partes[0], partes[1]
-                            
-                            if 'Média' in metrica:
-                                media = float(valor)
-                            elif 'Variância' in metrica:
-                                variancia = float(valor)
-                            elif 'PSNR' in metrica:
-                                psnr = valor
-                except Exception as e:
-                    print(f"Erro ao ler o ficheiro {arquivo}: {e}")
-                    continue
-
-                linhas_tabela.append({
-                    "Imagem": objeto,
-                    "Categoria": categoria,
-                    "Configuração / Filtro": configuracao,
-                    "Média": media,
-                    "Variância": variancia,
-                    "PSNR (dB)": psnr
-                })
-
-    if not linhas_tabela:
-        print("Nenhum dado foi encontrado para consolidar!")
-        return None
-
-    # Transforma em DataFrame e ordena para ficar legível
-    df_final = pd.DataFrame(linhas_tabela)
-    df_final = df_final.sort_values(by=["Imagem", "Categoria", "Configuração / Filtro"]).reset_index(drop=True)
-
-    df_final.to_csv("tabela_comparativa_filtros.csv", index=False, encoding='utf-8')
-    
-    try:
-        df_final.to_excel("tabela_comparativa_filtros.xlsx", index=False)
-        print("[DEBUG] Tabela final atualizada com SUCESSO tanto em .csv quanto em .xlsx!")
-    except ImportError:
-        print("[INFO] Tabela final atualizada com SUCESSO em 'tabela_comparativa_filtros.csv'!")
-
-    return df_final
 
 if __name__ == "__main__":
     tabela_completa = tabela_final()
