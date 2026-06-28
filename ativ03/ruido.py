@@ -2,9 +2,11 @@ img1_path=r"C:\Users\LENOVO\Documents\VisaoComputacional\atividades\ativ03\img\b
 img2_path=r"C:\Users\LENOVO\Documents\VisaoComputacional\atividades\ativ03\img\sapato1.jpg"
 
 import os
+import csv
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 def parse_cv2(caminho_imagem):
     img = cv2.imread(caminho_imagem, 0)
@@ -249,6 +251,36 @@ def exibir_plots_psnr(img1_k3, psnr1_k3, img1_k7, psnr1_k7, nome_img1,
 
     plt.tight_layout()
     plt.show()
+
+def salvar_metricas_csv(dados_img1, nome_base_img1, psnr_img1,
+                        dados_img2, nome_base_img2, psnr_img2,
+                        nome_pasta, sufixo_arquivo):
+    """
+    Salva as métricas estatísticas (Média, Variância e PSNR) de duas imagens
+    em arquivos .csv separados, organizados dentro de uma pasta específica.
+    """
+    if not os.path.exists(nome_pasta):
+        os.makedirs(nome_pasta)
+        print(f"=== [DEBUG] === Pasta '{nome_pasta}' criada.")
+
+    caminho_csv1 = os.path.join(nome_pasta, f"{nome_base_img1}_{sufixo_arquivo}.csv")
+    with open(caminho_csv1, mode='w', newline='', encoding='utf-8') as f1:
+        writer = csv.writer(f1)
+        writer.writerow(["Métrica", "Valor"])
+        writer.writerow(["Média", f"{dados_img1['media']:.4f}"])
+        writer.writerow(["Variância", f"{dados_img1['variancia']:.4f}"])
+        writer.writerow(["PSNR (dB)", f"{psnr_img1:.2f}" if psnr_img1 is not None else "N/A"])
+    
+    caminho_csv2 = os.path.join(nome_pasta, f"{nome_base_img2}_{sufixo_arquivo}.csv")
+    with open(caminho_csv2, mode='w', newline='', encoding='utf-8') as f2:
+        writer = csv.writer(f2)
+        writer.writerow(["Métrica", "Valor"])
+        writer.writerow(["Média", f"{dados_img2['media']:.4f}"])
+        writer.writerow(["Variância", f"{dados_img2['variancia']:.4f}"])
+        writer.writerow(["PSNR (dB)", f"{psnr_img2:.2f}" if psnr_img2 is not None else "N/A"])
+
+    print(f"[DEBUG] Dados exportados: {caminho_csv1} e {caminho_csv2}")
+
 """ 
 ================
     PARTE 1 
@@ -288,8 +320,16 @@ img2_ruido = np.clip(img2 + noise2, 0, 255).astype(np.uint8)
 dados_banco_ruido = calcular_metricas_imagem(img1_ruido)
 dados_sapato_ruido = calcular_metricas_imagem(img2_ruido)
 
-exibir_plots(dados_banco_ruido, 'Banco com Ruído Gauss', dados_sapato_ruido, 'Sapato com Ruído Gauss') #imagem c ruido gaussiano
+psnr_banco_ruido=calcular_psnr(img1,img1_ruido)
+psnr_sapato_ruido=calcular_psnr(img2,img2_ruido)
 
+exibir_plots(dados_banco_ruido, 'Banco com Ruído Gauss', dados_sapato_ruido, 'Sapato com Ruído Gauss') #imagem c ruido gaussiano
+salvar_metricas_csv (
+    dados_banco_ruido, 'banco', psnr_banco_ruido,
+    dados_sapato_ruido, 'sapato', psnr_sapato_ruido,
+    nome_pasta='filtro_gaussiano',
+    sufixo_arquivo='ruido_gauss'
+)
 """ 
 =================== 
 COMENTARIOS 
@@ -324,11 +364,19 @@ img2_sp = salt_and_pepper_noise(img2, 0.2)
 dados_banco_sp = calcular_metricas_imagem(img1_sp)
 dados_sapato_sp = calcular_metricas_imagem(img2_sp)
 
-exibir_plots(dados_banco_sp,'Banco ruído sp',dados_sapato_sp,'Sapato ruído sp') #imagem com ruido sal e pimenta
+psnr_banco_sp=calcular_psnr(img1,img1_sp)
+psnr_sapato_sp=calcular_psnr(img2,img2_sp)
 
+exibir_plots(dados_banco_sp,'Banco ruído sp',dados_sapato_sp,'Sapato ruído sp') #imagem com ruido sal e pimenta
+salvar_metricas_csv (
+    dados_banco_sp, 'banco', psnr_banco_sp,
+    dados_sapato_sp, 'sapato', psnr_sapato_sp,
+    nome_pasta='filtro_sal_e_pimenta',
+    sufixo_arquivo='ruido_sp'
+)
 """ 
 =================== 
-COMENTARIOS 
+PARTE 2: COMENTARIOS 
 ===================
 *porcentagem de pixels alterados *: 20%
 
@@ -381,18 +429,32 @@ psnr_banco_7x7 = calcular_psnr(img1, banco_suave_7x7["imagem_filtrada"])
 psnr_sapato_3x3 = calcular_psnr(img2, sapato_suave_3x3["imagem_filtrada"])
 psnr_sapato_7x7 = calcular_psnr(img2, sapato_suave_7x7["imagem_filtrada"])
 
-exibir_plots_psnr (
+""" exibir_plots_psnr (
     banco_suave_3x3["imagem_filtrada"], psnr_banco_3x3, 
     banco_suave_7x7["imagem_filtrada"], psnr_banco_7x7, 
     'Banco',
     sapato_suave_3x3["imagem_filtrada"], psnr_sapato_3x3, 
     sapato_suave_7x7["imagem_filtrada"], psnr_sapato_7x7, 
     'Sapato'
+) """
+
+salvar_metricas_csv (
+    dados_banco_3x3, 'banco', psnr_banco_3x3,
+    dados_sapato_3x3, 'sapato', psnr_sapato_3x3,
+    nome_pasta='filtro_passa_baixa_gaussiano_',
+    sufixo_arquivo='3x3'
+)
+
+salvar_metricas_csv (
+    dados_banco_7x7, 'banco', psnr_banco_7x7,
+    dados_sapato_7x7, 'sapato', psnr_sapato_7x7,
+    nome_pasta='filtro_passa_baixa_gaussiano_',
+    sufixo_arquivo='7x7'
 )
 
 """ 
 =================== 
-COMENTARIOS 
+PARTE 3: COMENTARIOS 
 ===================
 Os resultados quantitativos apontaram um PSNR superior para o Filtro Gaussiano com kernel 7x7 em comparação ao kernel 3x3.
 """
@@ -416,11 +478,19 @@ sapato_pa_laplace = passa_alta_laplaciano(img2)
 dados_banco_pa_laplace = calcular_metricas_imagem(banco_pa_laplace["imagem_filtrada"])
 dados_sapato_pa_laplace = calcular_metricas_imagem(sapato_pa_laplace["imagem_filtrada"])
 
-exibir_plots(dados_banco_pa_laplace, 'Banco Passa Alta Laplace', dados_sapato_pa_laplace, 'Sapato Passa Alta Laplace')
+banco_laplace_psnr=calcular_psnr(img1,banco_pa_laplace["imagem_filtrada"])
+sapato_laplace_psnr=calcular_psnr(img2,sapato_pa_laplace["imagem_filtrada"])
 
+exibir_plots(dados_banco_pa_laplace, 'Banco Passa Alta Laplace', dados_sapato_pa_laplace, 'Sapato Passa Alta Laplace')
+salvar_metricas_csv (
+    dados_banco_pa_laplace, 'banco_laplace',banco_laplace_psnr,
+    dados_sapato_pa_laplace, 'sapato_laplace', sapato_laplace_psnr,
+    nome_pasta='filtro_passa_alta_laplace_',
+    sufixo_arquivo='_passaalta'
+)
 """ 
 =================== 
-COMENTARIOS 
+PARTE 4: COMENTARIOS 
 ===================
 Quando aplicado na imagem com ruído, o resultado do filtro apresentou degradação significativa. Como o ruído Gaussiano 
 inserido no passo anterior possui alta frequência espacial (variações bruscas pixel a pixel) e o filtro Laplaciano é 
@@ -446,6 +516,81 @@ detecção de foco automático, identificação de pontos de interesse (como qui
 """ Responder: 
  Qual ruído degradou mais a imagem? Laplaciano.
  O filtro gaussiano conseguiu recuperar a qualidade visual? Não muito.  
- Em quais aplicações de visão computacional seria importante aplicar filtros antes do 
-processamento? 
+ Em quais aplicações de visão computacional seria importante aplicar filtros antes do processamento? 
  """
+
+def tabela_final():
+    """
+    Varre os diretórios do projeto, lê os ficheiros .csv individuais de métricas,
+    e consolida tudo numa única tabela comparativa final completa.
+    """
+    linhas_tabela = []
+
+    mapeamento_pastas = {
+        'filtro_sal_e_pimenta': 'Ruído Sal e Pimenta',
+        'filtro_gaussiano': 'Ruído Gaussiano',
+        'filtro_passa_baixa_gaussiano_': 'Filtro Passa Baixa Gaussiano',
+        'filtro_passa_alta_laplace_': 'Passa-Alta Laplaciano' 
+    }
+
+    for pasta, categoria in mapeamento_pastas.items():
+        if not os.path.exists(pasta):
+            print(f"Aviso: A pasta '{pasta}' ainda não existe ou não foi processada.")
+            continue
+            
+        for arquivo in os.listdir(pasta):
+            if arquivo.endswith('.csv'):
+                caminho_completo = os.path.join(pasta, arquivo)
+
+                objeto = 'Banco' if arquivo.lower().startswith('banco') else 'Sapato'
+                configuracao = arquivo.replace(f"{objeto.lower()}_", "").replace(".csv", "").replace("_", " ").title()
+                media, variancia, psnr = None, None, None
+
+                try:
+                    with open(caminho_completo, mode='r', encoding='utf-8') as f:
+                        next(f) # Pula o cabeçalho "Métrica,Valor"
+                        for linha in f:
+                            partes = linha.strip().split(',')
+                            if len(partes) < 2:
+                                continue
+                            metrica, valor = partes[0], partes[1]
+                            
+                            if 'Média' in metrica:
+                                media = float(valor)
+                            elif 'Variância' in metrica:
+                                variancia = float(valor)
+                            elif 'PSNR' in metrica:
+                                psnr = valor
+                except Exception as e:
+                    print(f"Erro ao ler o ficheiro {arquivo}: {e}")
+                    continue
+
+                linhas_tabela.append({
+                    "Imagem": objeto,
+                    "Categoria": categoria,
+                    "Configuração / Filtro": configuracao,
+                    "Média": media,
+                    "Variância": variancia,
+                    "PSNR (dB)": psnr
+                })
+
+    if not linhas_tabela:
+        print("Nenhum dado foi encontrado para consolidar!")
+        return None
+
+    # Transforma em DataFrame e ordena para ficar legível
+    df_final = pd.DataFrame(linhas_tabela)
+    df_final = df_final.sort_values(by=["Imagem", "Categoria", "Configuração / Filtro"]).reset_index(drop=True)
+
+    df_final.to_csv("tabela_comparativa_filtros.csv", index=False, encoding='utf-8')
+    
+    try:
+        df_final.to_excel("tabela_comparativa_filtros.xlsx", index=False)
+        print("[DEBUG] Tabela final atualizada com SUCESSO tanto em .csv quanto em .xlsx!")
+    except ImportError:
+        print("[INFO] Tabela final atualizada com SUCESSO em 'tabela_comparativa_filtros.csv'!")
+
+    return df_final
+
+if __name__ == "__main__":
+    tabela_completa = tabela_final()

@@ -1,0 +1,11 @@
+Imagem,Categoria,Configuração / Filtro,Média,Variância,PSNR (dB)
+Banco,Filtro Passa Baixa Gaussiano,3X3,112.8104,2064.1403,27.16
+Banco,Filtro Passa Baixa Gaussiano,7X7,112.7783,1959.5907,31.84
+Banco,Passa-Alta Laplaciano,Laplace  Passaalta,3.8456,70.1275,6.65
+Banco,Ruído Gaussiano,Ruido Gauss,112.7789,2823.4569,18.72
+Banco,Ruído Sal e Pimenta,Ruido Sp,115.9537,4893.3703,12.46
+Sapato,Filtro Passa Baixa Gaussiano,3X3,142.2672,3007.1971,27.16
+Sapato,Filtro Passa Baixa Gaussiano,7X7,142.2364,2892.3026,31.51
+Sapato,Passa-Alta Laplaciano,Laplace  Passaalta,2.0313,23.4592,4.55
+Sapato,Ruído Gaussiano,Ruido Gauss,142.2361,3768.1743,18.75
+Sapato,Ruído Sal e Pimenta,Ruido Sp,139.5692,5657.6823,12.24
